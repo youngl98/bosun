@@ -151,7 +151,7 @@ func c_snmp_generic(cfg conf.SNMP, mib conf.MIB) (opentsdb.MultiDataPoint, error
 				if !ok {
 					return md, fmt.Errorf("tree for tag %s has no entry for metric %s index %d.", tree.TagKey, metric.Metric, i)
 				}
-				tagset[tree.TagKey] = fmt.Sprintf("%s", tagVal)
+				tagset[tree.TagKey] = fmt.Sprint(tagVal)
 				Add(&md, metric.Metric, v, tagset, rate, unit, metric.Description)
 			}
 		}

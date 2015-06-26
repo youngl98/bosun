@@ -9,11 +9,12 @@ import (
 	"strconv"
 	"strings"
 
+	"bosun.org/cmd/scollector/conf"
 	"bosun.org/metadata"
 	"bosun.org/opentsdb"
 )
 
-func AddProcessConfig(params ProcessParams) error {
+func AddProcessConfig(params conf.ProcessParams) error {
 	p, err := NewWatchedProc(params)
 	if err != nil {
 		return err
@@ -185,12 +186,6 @@ func c_linux_processes(procs []*WatchedProc) (opentsdb.MultiDataPoint, error) {
 	return md, err
 }
 
-type ProcessParams struct {
-	Command string
-	Name    string
-	Args    string
-}
-
 type Process struct {
 	Pid       string
 	Command   string
@@ -198,7 +193,7 @@ type Process struct {
 }
 
 // NewWatchedProc takes a string of the form "command,name,regex".
-func NewWatchedProc(params ProcessParams) (*WatchedProc, error) {
+func NewWatchedProc(params conf.ProcessParams) (*WatchedProc, error) {
 	if params.Name == "" {
 		params.Name = params.Command
 	}

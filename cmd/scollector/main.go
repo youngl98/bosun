@@ -327,7 +327,7 @@ func toToml(fname string) {
 			}
 		case "icmp":
 			for _, i := range strings.Split(v, ",") {
-				c.ICMP = append(c.ICMP, conf.ICMP{i})
+				c.ICMP = append(c.ICMP, conf.ICMP{Host: i})
 			}
 		case "haproxy":
 			if v != "" {
@@ -437,7 +437,7 @@ func toToml(fname string) {
 `, v))
 			}
 		case "process_dotnet":
-			c.ProcessDotNet = append(c.ProcessDotNet, conf.ProcessDotNet{v})
+			c.ProcessDotNet = append(c.ProcessDotNet, conf.ProcessDotNet{Name: v})
 		case "keepalived_community":
 			c.KeepalivedCommunity = v
 		default:

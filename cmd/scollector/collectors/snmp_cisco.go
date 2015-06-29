@@ -24,9 +24,10 @@ func SNMPCisco(cfg conf.SNMP) {
 		},
 		Trees: []conf.MIBTree{
 			{
-				BaseOid:        ".48.1.1.1",
-				TagKey:         "name",
-				LabelSourceOid: ".2",
+				BaseOid: ".48.1.1.1",
+				Tags: []conf.MIBTag{
+					{Key: "name", Oid: ".2"},
+				},
 				Metrics: []conf.MIBMetric{
 					{
 						Metric: "cisco.mem.used",

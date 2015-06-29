@@ -85,13 +85,18 @@ type MIBMetric struct {
 	RateType    string // defaults to gauge
 	Description string
 	FallbackOid string // Oid to try if main one doesn't work. Used in cisco where different models use different oids
+	Tags        string // static tags to populate for this metric. "direction=in"
+}
+
+type MIBTag struct {
+	Key string
+	Oid string // If present will load from this oid. Use "idx" to populate with index of row instead of another oid.
 }
 
 type MIBTree struct {
-	BaseOid        string
-	TagKey         string
-	LabelSourceOid string
-	Metrics        []MIBMetric
+	BaseOid string
+	Tags    []MIBTag
+	Metrics []MIBMetric
 }
 
 type ProcessDotNet struct {

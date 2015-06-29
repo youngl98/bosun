@@ -125,12 +125,24 @@ func c_snmp_generic(cfg conf.SNMP, mib conf.MIB) (opentsdb.MultiDataPoint, error
 	}
 	for _, tree := range mib.Trees {
 		treeOid := combineOids(tree.BaseOid, baseOid)
-		names, err := snmp_subtree(cfg.Host, cfg.Community, treeOid+tree.LabelSourceOid)
-		if err != nil {
-			return md, err
+		tagCache := make(map[string]map[int]interface{}) // tag key to map of values
+		for _, tag := range tree.Tags {
+			if tag.Oid == "idx" {
+				continue
+			}
+			vals, err := snmp_subtree(cfg.Host, cfg.Community, combineOids(tag.Oid, treeOid))
+			if err != nil {
+				return md, err
+			}
+			tagCache[tag.Key] = vals
 		}
 		for _, metric := range tree.Metrics {
-			tagset := opentsdb.TagSet{"host": cfg.Host}
+			tagset, err := opentsdb.ParseTags(metric.Tags)
+			if err != nil {
+				fmt.Println("AAAAA")
+				return md, err
+			}
+			tagset["host"] = cfg.Host
 			rate := metadata.RateType(metric.RateType)
 			if rate == "" {
 				rate = metadata.Gauge
@@ -139,19 +151,34 @@ func c_snmp_generic(cfg conf.SNMP, mib conf.MIB) (opentsdb.MultiDataPoint, error
 			if unit == "" {
 				unit = metadata.None
 			}
+			fmt.Println(combineOids(metric.Oid, treeOid))
 			nodes, err := snmp_subtree(cfg.Host, cfg.Community, combineOids(metric.Oid, treeOid))
 			if err != nil {
+				fmt.Println("BBBBBB")
 				return md, err
 			}
-			if len(nodes) != len(names) {
-				return md, fmt.Errorf("snmp tree for %s, and names have different lengths", metric.Metric)
+			// check all lengths
+			for k, list := range tagCache {
+				if len(list) != len(nodes) {
+					return md, fmt.Errorf("snmp tree for tag key %s, and metric %s do not have same length", k, metric.Metric)
+				}
 			}
 			for i, v := range nodes {
-				tagVal, ok := names[i]
-				if !ok {
-					return md, fmt.Errorf("tree for tag %s has no entry for metric %s index %d.", tree.TagKey, metric.Metric, i)
+
+				for _, tag := range tree.Tags {
+					var tagVal interface{}
+					if tag.Oid == "idx" {
+						tagVal = i
+					} else {
+						var ok bool
+						tagVal, ok = tagCache[tag.Key][i]
+						if !ok {
+							fmt.Println("CCCCCC")
+							return md, fmt.Errorf("tree for tag %s has no entry for metric %s index %d.", tag.Key, metric.Metric, i)
+						}
+					}
+					tagset[tag.Key] = fmt.Sprint(tagVal)
 				}
-				tagset[tree.TagKey] = fmt.Sprint(tagVal)
 				Add(&md, metric.Metric, v, tagset, rate, unit, metric.Description)
 			}
 		}

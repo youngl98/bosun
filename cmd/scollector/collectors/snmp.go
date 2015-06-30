@@ -103,16 +103,30 @@ func c_snmp_generic(cfg conf.SNMP, mib conf.MIB) (opentsdb.MultiDataPoint, error
 	md := opentsdb.MultiDataPoint{}
 	baseOid := mib.BaseOid
 
+	rateUnitTags := func(m conf.MIBMetric) (r metadata.RateType, u metadata.Unit, t opentsdb.TagSet, err error) {
+		if r = metadata.RateType(m.RateType); r == "" {
+			r = metadata.Gauge
+		}
+		if u = metadata.Unit(m.Unit); u == "" {
+			u = metadata.None
+		}
+		if m.Tags == "" {
+			t = make(opentsdb.TagSet)
+		} else {
+			t, err = opentsdb.ParseTags(m.Tags)
+			if err != nil {
+				return "", "", nil, err
+			}
+		}
+		t["host"] = cfg.Host
+		return
+	}
+
 	for _, metric := range mib.Metrics {
-		rate := metadata.RateType(metric.RateType)
-		if rate == "" {
-			rate = metadata.Gauge
+		rate, unit, tagset, err := rateUnitTags(metric)
+		if err != nil {
+			return md, err
 		}
-		unit := metadata.Unit(metric.Unit)
-		if unit == "" {
-			unit = metadata.None
-		}
-		tagset := opentsdb.TagSet{"host": cfg.Host}
 
 		v, err := snmp_oid(cfg.Host, cfg.Community, combineOids(metric.Oid, baseOid))
 		if err != nil && metric.FallbackOid != "" {
@@ -137,24 +151,16 @@ func c_snmp_generic(cfg conf.SNMP, mib conf.MIB) (opentsdb.MultiDataPoint, error
 			tagCache[tag.Key] = vals
 		}
 		for _, metric := range tree.Metrics {
-			tagset, err := opentsdb.ParseTags(metric.Tags)
+			rate, unit, tagset, err := rateUnitTags(metric)
 			if err != nil {
-				fmt.Println("AAAAA")
 				return md, err
+
 			}
-			tagset["host"] = cfg.Host
-			rate := metadata.RateType(metric.RateType)
-			if rate == "" {
-				rate = metadata.Gauge
-			}
-			unit := metadata.Unit(metric.Unit)
-			if unit == "" {
-				unit = metadata.None
-			}
-			fmt.Println(combineOids(metric.Oid, treeOid))
 			nodes, err := snmp_subtree(cfg.Host, cfg.Community, combineOids(metric.Oid, treeOid))
+			if err != nil && metric.FallbackOid != "" {
+				nodes, err = snmp_subtree(cfg.Host, cfg.Community, combineOids(metric.FallbackOid, treeOid))
+			}
 			if err != nil {
-				fmt.Println("BBBBBB")
 				return md, err
 			}
 			// check all lengths
@@ -164,7 +170,6 @@ func c_snmp_generic(cfg conf.SNMP, mib conf.MIB) (opentsdb.MultiDataPoint, error
 				}
 			}
 			for i, v := range nodes {
-
 				for _, tag := range tree.Tags {
 					var tagVal interface{}
 					if tag.Oid == "idx" {
@@ -173,8 +178,7 @@ func c_snmp_generic(cfg conf.SNMP, mib conf.MIB) (opentsdb.MultiDataPoint, error
 						var ok bool
 						tagVal, ok = tagCache[tag.Key][i]
 						if !ok {
-							fmt.Println("CCCCCC")
-							return md, fmt.Errorf("tree for tag %s has no entry for metric %s index %d.", tag.Key, metric.Metric, i)
+							return md, fmt.Errorf("tree for tag %s has no entry for metric %s index %d", tag.Key, metric.Metric, i)
 						}
 					}
 					tagset[tag.Key] = fmt.Sprint(tagVal)

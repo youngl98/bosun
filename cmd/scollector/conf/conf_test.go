@@ -9,7 +9,6 @@ import (
 
 // build a data structure and serialize it. This is easier sometimes than building by hand.
 func TestMIBSerialization(t *testing.T) {
-
 	m := MIB{}
 	m.BaseOid = "1.3.6.1.2.1.33.1"
 	m.Trees = []MIBTree{

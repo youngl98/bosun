@@ -11,7 +11,6 @@ import (
 
 // SNMPCisco registers a SNMP CISCO collector for the given community and host.
 func SNMPCisco(cfg conf.SNMP) {
-
 	mib := conf.MIB{
 		BaseOid: "1.3.6.1.4.1.9.9",
 		Metrics: []conf.MIBMetric{

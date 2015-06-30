@@ -137,6 +137,7 @@ func c_snmp_generic(cfg conf.SNMP, mib conf.MIB) (opentsdb.MultiDataPoint, error
 		}
 		Add(&md, metric.Metric, v, tagset, rate, unit, metric.Description)
 	}
+
 	for _, tree := range mib.Trees {
 		treeOid := combineOids(tree.BaseOid, baseOid)
 		tagCache := make(map[string]map[int]interface{}) // tag key to map of values

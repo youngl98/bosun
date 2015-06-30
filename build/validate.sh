@@ -33,5 +33,7 @@ echo -e "\nRunning go test bosun.org/..."
 go test bosun.org/...
 GOTESTRESULT=$?
 
+git diff
+
 let "RESULT = $GOFMTRESULT | $GOVETRESULT | $GOTESTRESULT | $GOGENERATERESULT | $GOGENERATEDIFFRESULT"
 exit $RESULT

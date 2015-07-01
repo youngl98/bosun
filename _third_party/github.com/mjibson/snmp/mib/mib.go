@@ -2,8 +2,8 @@
 package mib
 
 import (
+	"bosun.org/_third_party/github.com/mjibson/snmp/asn1"
 	"bytes"
-	"encoding/asn1"
 	"fmt"
 	"os/exec"
 	"strconv"

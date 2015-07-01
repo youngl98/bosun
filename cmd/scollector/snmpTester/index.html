@@ -1,0 +1,142 @@
+<!doctype html>
+<html ng-app="snmpApp">
+<head>
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.16/angular.min.js"></script>
+<script>
+angular.module('snmpApp', [])
+  .controller('SnmpController', function($scope, $http) {
+	var mib = {}
+	$scope.mib = mib
+	
+  	mib.Name = "ups";
+	mib.Host = "nyhq-ups01";
+	mib.Community = "s3cur3";
+	mib.BaseOid = "1.3.6.1.2.1.33.1";
+	mib.Metrics = [
+		{Metric: "upsBatteryTemperature", Oid:".2.7.0", Unit: "V", RateType:"gauge", Description: "voltage of ups battery",FallbackOid: "", Tags:""},
+	];
+	mib.Trees = [
+		{
+			BaseOid: ".3.3.1", 
+			Tags: [{Key: "source", Oid: "idx"}],
+			Metrics: [
+				{Metric: "environment.power.voltage", Oid:".3", Tags:"direction=input"},
+				{Metric: "environment.power.frequency", Oid:".2", Tags:"direction=input"},
+			],
+		},
+	]
+	
+	$scope.removeMetric = function(m,a){
+		var index = a.indexOf(m);
+		if (index > -1) {
+    		a.splice(index, 1);
+		}
+	}
+	
+	$scope.addMetric = function(a){
+		a.push({Metric: "", Oid:"", Unit: "", RateType:"", Description: "",FallbackOid: "", Tags:""})
+	}
+	
+	$scope.addTag = function(t){
+		t.Tags.push({Key: "", Oid: ""})
+	}
+	
+	$scope.addTree = function(){
+		mib.Trees.push({BaseOid:"",Tags:[], Metrics:[]})
+	}
+	
+	$scope.removeTag = function(tag,t){
+		var index = t.Tags.indexOf(tag);
+		if (index > -1) {
+    		t.Tags.splice(index, 1);
+		}
+	}
+	
+	$scope.removeTree = function(t){
+		var index = mib.Trees.indexOf(t);
+		if (index > -1) {
+    		mib.Trees.splice(index, 1);
+		}
+	}
+	
+	$scope.test = function(){
+		$http.post('/test', mib).
+  		success(function(data, status, headers, config) {
+  			$scope.results = JSON.stringify(data, null, 2)
+  		}).
+  		error(function(data, status, headers, config) {
+    		console.log("error!!")
+  		});
+	}
+	$scope.toml = function(){
+		$http.post('/toml', mib).
+  		success(function(data, status, headers, config) {
+  			$scope.results = data
+  		}).
+  		error(function(data, status, headers, config) {
+    		console.log("error!!")
+  		});
+	}
+	
+  });
+</script>
+</head>
+<body ng-controller="SnmpController">
+<h3>MIB</h3>
+Name: <input type='text' ng-model="mib.Name"><br/>
+Host: <input type='text' ng-model="mib.Host"><br/>
+Community: <input type='text' ng-model="mib.Community"><br/>
+Base Oid: <input type='text' ng-model="mib.BaseOid"><br/>
+<hr/>
+<h3>Simple Metrics</h3>
+<ul style='clear:both'>
+<li ng-repeat="m in mib.Metrics" style='float:left;'><div>
+	Metric: <input type='text' ng-model="m.Metric"> <br/>
+	Oid: <input type='text' ng-model="m.Oid"> <br/>
+	Unit: <input type='text' ng-model="m.Unit"><br/>
+	Rate Type: <input type='text' ng-model="m.RateType"><br/>
+	Description: <input type='text' ng-model="m.Description"><br/>
+	FallbackOid: <input type='text' ng-model="m.FallbackOid"><br/>
+	Tags: <input type='text' ng-model="m.Tags"><br/>
+	<button ng-click="removeMetric(m,mib.Metrics)">Remove</button>
+</div></li>
+</ul>
+<div style='clear:both'></div>
+<button ng-click="addMetric(mib.Metrics)">Add</button>
+<hr/>
+<h3> Trees: </h3>
+<div ng-repeat="t in mib.Trees">
+	Base Oid: <input type='text' ng-model="t.BaseOid"><br/>
+	<h4>Tags:</h4>
+	<ul>
+		<li ng-repeat="tag in t.Tags">
+			Key: <input type='text' ng-model="tag.Key"> 
+			Oid: <input type='text' ng-model="tag.Oid">
+			<button ng-click='removeTag(tag,t)'>remove</button>
+		</li>
+	</ul>
+	<button ng-click="addTag(t)">Add tag</button>
+	<h4>Metrics:</h4>
+	<ul style='clear:both'>
+		<li ng-repeat="m in t.Metrics" style='float:left;'><div>
+			Metric: <input type='text' ng-model="m.Metric"> <br/>
+			Oid: <input type='text' ng-model="m.Oid"> <br/>
+			Unit: <input type='text' ng-model="m.Unit"><br/>
+			Rate Type: <input type='text' ng-model="m.RateType"><br/>
+			Description: <input type='text' ng-model="m.Description"><br/>
+			FallbackOid: <input type='text' ng-model="m.FallbackOid"><br/>
+			Tags: <input type='text' ng-model="m.Tags"><br/>
+			<button ng-click="removeMetric(m,t.Metrics)">Remove</button>
+		</div></li>
+	</ul>
+<div style='clear:both'></div>
+<button ng-click="addMetric(t.Metrics)">Add Metric</button><button ng-click="removeTree(t)">Remove Tree</button>
+</div>
+<button ng-click="addTree()">Add Tree</button>
+<hr/>
+<button ng-click='test()'>TEST!!</button><button ng-click='toml()'>TOML</button>
+<pre ng-bind="results">
+
+</pre>
+</body>
+</html>

@@ -1,7 +1,7 @@
 package snmp
 
 import (
-	"encoding/asn1"
+	"bosun.org/_third_party/github.com/mjibson/snmp/asn1"
 	"fmt"
 	"io"
 

@@ -25,7 +25,6 @@ import (
 
 func init() {
 	gob.Register(expr.Number(0))
-	gob.Register(expr.Scalar(0))
 }
 
 type Schedule struct {

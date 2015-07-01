@@ -147,11 +147,9 @@ func (n Number) Type() parse.FuncType         { return parse.TypeNumberSet }
 func (n Number) Value() interface{}           { return n }
 func (n Number) MarshalJSON() ([]byte, error) { return marshalFloat(float64(n)) }
 
-type Scalar float64
+type Float float64
 
-func (s Scalar) Type() parse.FuncType         { return parse.TypeScalar }
-func (s Scalar) Value() interface{}           { return s }
-func (s Scalar) MarshalJSON() ([]byte, error) { return marshalFloat(float64(s)) }
+func (f Float) MarshalJSON() ([]byte, error) { return marshalFloat(float64(f)) }
 
 // Series is the standard form within bosun to represent timeseries data.
 type Series map[time.Time]float64
@@ -162,7 +160,7 @@ func (s Series) Value() interface{}   { return s }
 func (s Series) MarshalJSON() ([]byte, error) {
 	r := make(map[string]interface{}, len(s))
 	for k, v := range s {
-		r[fmt.Sprint(k.Unix())] = Scalar(v)
+		r[fmt.Sprint(k.Unix())] = Float(v)
 	}
 	return json.Marshal(r)
 }
@@ -194,6 +192,18 @@ type Result struct {
 	Computations
 	Value
 	Group opentsdb.TagSet
+}
+
+// Copy returns a copy of r with a deep copy of Computations and Group, but
+// shallow copy of Value.
+func (r *Result) Copy() Result {
+	v := Result{
+		Value: r.Value,
+		Group: r.Group.Copy(),
+		Computations: make(Computations, len(r.Computations)),
+	}
+	copy(v.Computations, r.Computations)
+	return v
 }
 
 type Results struct {
@@ -274,7 +284,7 @@ func wrap(v float64) *Results {
 	return &Results{
 		Results: []*Result{
 			{
-				Value: Scalar(v),
+				Value: Number(v),
 				Group: nil,
 			},
 		},
@@ -393,31 +403,8 @@ func (e *State) walkBinary(node *parse.BinaryNode, T miniprofiler.Timer) *Result
 				Computations: v.Computations,
 			}
 			switch at := v.A.(type) {
-			case Scalar:
-				switch bt := v.B.(type) {
-				case Scalar:
-					n := Scalar(operate(node.OpStr, float64(at), float64(bt)))
-					e.AddComputation(r, node.String(), Number(n))
-					value = n
-				case Number:
-					n := Number(operate(node.OpStr, float64(at), float64(bt)))
-					e.AddComputation(r, node.String(), n)
-					value = n
-				case Series:
-					s := make(Series)
-					for k, v := range bt {
-						s[k] = operate(node.OpStr, float64(at), float64(v))
-					}
-					value = s
-				default:
-					panic(ErrUnknownOp)
-				}
 			case Number:
 				switch bt := v.B.(type) {
-				case Scalar:
-					n := Number(operate(node.OpStr, float64(at), float64(bt)))
-					e.AddComputation(r, node.String(), Number(n))
-					value = n
 				case Number:
 					n := Number(operate(node.OpStr, float64(at), float64(bt)))
 					e.AddComputation(r, node.String(), n)
@@ -433,7 +420,7 @@ func (e *State) walkBinary(node *parse.BinaryNode, T miniprofiler.Timer) *Result
 				}
 			case Series:
 				switch bt := v.B.(type) {
-				case Number, Scalar:
+				case Number:
 					bv := reflect.ValueOf(bt).Float()
 					s := make(Series)
 					for k, v := range at {
@@ -535,13 +522,10 @@ func (e *State) walkUnary(node *parse.UnaryNode, T miniprofiler.Timer) *Results 
 	a := e.walk(node.Arg, T)
 	T.Step("walkUnary: "+node.OpStr, func(T miniprofiler.Timer) {
 		for _, r := range a.Results {
-			if an, aok := r.Value.(Scalar); aok && math.IsNaN(float64(an)) {
-				r.Value = Scalar(math.NaN())
+			if an, aok := r.Value.(Number); aok && math.IsNaN(float64(an)) {
 				continue
 			}
 			switch rt := r.Value.(type) {
-			case Scalar:
-				r.Value = Scalar(uoperate(node.OpStr, float64(rt)))
 			case Number:
 				r.Value = Number(uoperate(node.OpStr, float64(rt)))
 			case Series:
@@ -584,13 +568,13 @@ func (e *State) walkFunc(node *parse.FuncNode, T miniprofiler.Timer) *Results {
 			case *parse.StringNode:
 				v = t.Text
 			case *parse.NumberNode:
-				v = t.Float64
+				v = fromScalar(t.Float64)
 			case *parse.FuncNode:
-				v = extractScalar(e.walkFunc(t, T))
+				v = e.walkFunc(t, T)
 			case *parse.UnaryNode:
-				v = extractScalar(e.walkUnary(t, T))
+				v = e.walkUnary(t, T)
 			case *parse.BinaryNode:
-				v = extractScalar(e.walkBinary(t, T))
+				v = e.walkBinary(t, T)
 			default:
 				panic(fmt.Errorf("expr: unknown func arg type"))
 			}
@@ -602,7 +586,7 @@ func (e *State) walkFunc(node *parse.FuncNode, T miniprofiler.Timer) *Results {
 		if len(fr) > 1 && !fr[1].IsNil() {
 			err := fr[1].Interface().(error)
 			if err != nil {
-				panic(err)
+				panic(fmt.Errorf("%s: %v", node.Name, err))
 			}
 		}
 		if node.Return() == parse.TypeNumberSet {
@@ -611,13 +595,5 @@ func (e *State) walkFunc(node *parse.FuncNode, T miniprofiler.Timer) *Results {
 			}
 		}
 	})
-	return res
-}
-
-// extractScalar will return a float64 if res contains exactly one scalar.
-func extractScalar(res *Results) interface{} {
-	if len(res.Results) == 1 && res.Results[0].Type() == parse.TypeScalar {
-		return float64(res.Results[0].Value.Value().(Scalar))
-	}
 	return res
 }

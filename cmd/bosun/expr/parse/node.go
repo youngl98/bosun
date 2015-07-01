@@ -191,7 +191,7 @@ func (n *NumberNode) Check(*Tree) error {
 }
 
 func (n *NumberNode) Return() FuncType {
-	return TypeScalar
+	return TypeNumberSet
 }
 
 func (n *NumberNode) Tags() (Tags, error) {
@@ -261,7 +261,7 @@ func (b *BinaryNode) Check(t *Tree) error {
 	if t1 == TypeSeriesSet {
 		check = t2
 	}
-	if check != TypeNumberSet && check != TypeScalar {
+	if check != TypeNumberSet {
 		return fmt.Errorf("parse: type error in %s: expected a number", b)
 	}
 	if err := b.Args[0].Check(t); err != nil {
@@ -327,7 +327,7 @@ func (u *UnaryNode) StringAST() string {
 
 func (u *UnaryNode) Check(t *Tree) error {
 	switch rt := u.Arg.Return(); rt {
-	case TypeNumberSet, TypeSeriesSet, TypeScalar:
+	case TypeNumberSet, TypeSeriesSet:
 		return u.Arg.Check(t)
 	default:
 		return fmt.Errorf("parse: type error in %s, expected %s, got %s", u, "number", rt)

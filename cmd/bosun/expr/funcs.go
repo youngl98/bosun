@@ -39,6 +39,10 @@ func tagQuery(args []parse.Node) (parse.Tags, error) {
 	return t, nil
 }
 
+func tagEmpty(args []parse.Node) (parse.Tags, error) {
+	return nil, nil
+}
+
 func tagFirst(args []parse.Node) (parse.Tags, error) {
 	return args[0].Tags()
 }
@@ -85,7 +89,7 @@ func tagRename(args []parse.Node) (parse.Tags, error) {
 // Graphite defines functions for use with a Graphite backend.
 var Graphite = map[string]parse.Func{
 	"graphiteBand": {
-		Args:   []parse.FuncType{parse.TypeString, parse.TypeString, parse.TypeString, parse.TypeString, parse.TypeScalar},
+		Args:   []parse.FuncType{parse.TypeString, parse.TypeString, parse.TypeString, parse.TypeString, parse.TypeNumberSet},
 		Return: parse.TypeSeriesSet,
 		Tags:   graphiteTagQuery,
 		F:      GraphiteBand,
@@ -101,7 +105,7 @@ var Graphite = map[string]parse.Func{
 // TSDB defines functions for use with an OpenTSDB backend.
 var TSDB = map[string]parse.Func{
 	"band": {
-		Args:   []parse.FuncType{parse.TypeString, parse.TypeString, parse.TypeString, parse.TypeScalar},
+		Args:   []parse.FuncType{parse.TypeString, parse.TypeString, parse.TypeString, parse.TypeNumberSet},
 		Return: parse.TypeSeriesSet,
 		Tags:   tagQuery,
 		F:      Band,
@@ -114,7 +118,8 @@ var TSDB = map[string]parse.Func{
 	},
 	"count": {
 		Args:   []parse.FuncType{parse.TypeString, parse.TypeString, parse.TypeString},
-		Return: parse.TypeScalar,
+		Return: parse.TypeNumberSet,
+		Tags:   tagEmpty,
 		F:      Count,
 	},
 	"q": {
@@ -124,7 +129,7 @@ var TSDB = map[string]parse.Func{
 		F:      Query,
 	},
 	"window": {
-		Args:   []parse.FuncType{parse.TypeString, parse.TypeString, parse.TypeString, parse.TypeScalar, parse.TypeString},
+		Args:   []parse.FuncType{parse.TypeString, parse.TypeString, parse.TypeString, parse.TypeNumberSet, parse.TypeString},
 		Return: parse.TypeSeriesSet,
 		Tags:   tagQuery,
 		F:      Window,
@@ -160,7 +165,7 @@ var builtins = map[string]parse.Func{
 		F:      First,
 	},
 	"forecastlr": {
-		Args:   []parse.FuncType{parse.TypeSeriesSet, parse.TypeScalar},
+		Args:   []parse.FuncType{parse.TypeSeriesSet, parse.TypeNumberSet},
 		Return: parse.TypeNumberSet,
 		Tags:   tagFirst,
 		F:      Forecast_lr,
@@ -196,7 +201,7 @@ var builtins = map[string]parse.Func{
 		F:      Min,
 	},
 	"percentile": {
-		Args:   []parse.FuncType{parse.TypeSeriesSet, parse.TypeScalar},
+		Args:   []parse.FuncType{parse.TypeSeriesSet, parse.TypeNumberSet},
 		Return: parse.TypeNumberSet,
 		Tags:   tagFirst,
 		F:      Percentile,
@@ -236,7 +241,8 @@ var builtins = map[string]parse.Func{
 	},
 	"ungroup": {
 		Args:   []parse.FuncType{parse.TypeNumberSet},
-		Return: parse.TypeScalar,
+		Return: parse.TypeNumberSet,
+		Tags:   tagEmpty,
 		F:      Ungroup,
 	},
 
@@ -250,23 +256,24 @@ var builtins = map[string]parse.Func{
 	},
 	"d": {
 		Args:   []parse.FuncType{parse.TypeString},
-		Return: parse.TypeScalar,
+		Return: parse.TypeNumberSet,
+		Tags:   tagEmpty,
 		F:      Duration,
 	},
 	"des": {
-		Args:   []parse.FuncType{parse.TypeSeriesSet, parse.TypeScalar, parse.TypeScalar},
+		Args:   []parse.FuncType{parse.TypeSeriesSet, parse.TypeNumberSet, parse.TypeNumberSet},
 		Return: parse.TypeSeriesSet,
 		Tags:   tagFirst,
 		F:      Des,
 	},
 	"dropge": {
-		Args:   []parse.FuncType{parse.TypeSeriesSet, parse.TypeScalar},
+		Args:   []parse.FuncType{parse.TypeSeriesSet, parse.TypeNumberSet},
 		Return: parse.TypeSeriesSet,
 		Tags:   tagFirst,
 		F:      DropGe,
 	},
 	"drople": {
-		Args:   []parse.FuncType{parse.TypeSeriesSet, parse.TypeScalar},
+		Args:   []parse.FuncType{parse.TypeSeriesSet, parse.TypeNumberSet},
 		Return: parse.TypeSeriesSet,
 		Tags:   tagFirst,
 		F:      DropLe,
@@ -279,7 +286,8 @@ var builtins = map[string]parse.Func{
 	},
 	"epoch": {
 		Args:   []parse.FuncType{},
-		Return: parse.TypeScalar,
+		Return: parse.TypeNumberSet,
+		Tags:   tagEmpty,
 		F:      Epoch,
 	},
 	"filter": {
@@ -289,13 +297,13 @@ var builtins = map[string]parse.Func{
 		F:      Filter,
 	},
 	"limit": {
-		Args:   []parse.FuncType{parse.TypeNumberSet, parse.TypeScalar},
+		Args:   []parse.FuncType{parse.TypeNumberSet, parse.TypeNumberSet},
 		Return: parse.TypeNumberSet,
 		Tags:   tagFirst,
 		F:      Limit,
 	},
 	"nv": {
-		Args:   []parse.FuncType{parse.TypeNumberSet, parse.TypeScalar},
+		Args:   []parse.FuncType{parse.TypeNumberSet, parse.TypeNumberSet},
 		Return: parse.TypeNumberSet,
 		Tags:   tagFirst,
 		F:      NV,
@@ -311,7 +319,7 @@ var builtins = map[string]parse.Func{
 func Epoch(e *State, T miniprofiler.Timer) (*Results, error) {
 	return &Results{
 		Results: []*Result{
-			{Value: Scalar(float64(e.now.Unix()))},
+			{Value: Number(float64(e.now.Unix()))},
 		},
 	}, nil
 }
@@ -363,7 +371,7 @@ func Duration(e *State, T miniprofiler.Timer, d string) (*Results, error) {
 	}
 	return &Results{
 		Results: []*Result{
-			{Value: Scalar(duration.Seconds())},
+			{Value: Number(duration.Seconds())},
 		},
 	}, nil
 }
@@ -852,7 +860,7 @@ func Change(e *State, T miniprofiler.Timer, query, sduration, eduration string) 
 	if err != nil {
 		return
 	}
-	r, err = reduce(e, T, r, change, (sd - ed).Seconds())
+	r, err = reduce(e, T, r, change, fromScalar((sd - ed).Seconds()))
 	return
 }
 
@@ -860,20 +868,41 @@ func change(dps Series, args ...float64) float64 {
 	return avg(dps) * args[0]
 }
 
-func reduce(e *State, T miniprofiler.Timer, series *Results, F func(Series, ...float64) float64, args ...float64) (*Results, error) {
+func fromScalar(f float64) *Results {
+	return &Results{
+		Results: ResultSlice{
+			&Result{
+				Value: Number(f),
+			},
+		},
+	}
+}
+
+func reduce(e *State, T miniprofiler.Timer, series *Results, F func(Series, ...float64) float64, args ...*Results) (*Results, error) {
 	res := *series
 	res.Results = nil
 	for _, s := range series.Results {
-		switch t := s.Value.(type) {
-		case Series:
-			if len(t) == 0 {
-				continue
-			}
-			s.Value = Number(F(t, args...))
-			res.Results = append(res.Results, s)
-		default:
-			panic(fmt.Errorf("expr: expected a series"))
+		t := s.Value.(Series)
+		if len(t) == 0 {
+			continue
 		}
+		var floats []float64
+		for _, num := range args {
+			for _, n := range num.Results {
+				if len(n.Group) == 0 || s.Group.Overlaps(n.Group) {
+					floats = append(floats, float64(n.Value.(Number)))
+					break
+				}
+			}
+		}
+		if len(floats) != len(args) {
+			if !series.IgnoreUnjoined {
+				return nil, fmt.Errorf("unjoined groups for %s", s.Group)
+			}
+			continue
+		}
+		s.Value = Number(F(t, floats...))
+		res.Results = append(res.Results, s)
 	}
 	return &res, nil
 }
@@ -913,7 +942,7 @@ func Count(e *State, T miniprofiler.Timer, query, sduration, eduration string) (
 	}
 	return &Results{
 		Results: []*Result{
-			{Value: Scalar(len(r.Results))},
+			{Value: Number(len(r.Results))},
 		},
 	}, nil
 }
@@ -1048,7 +1077,7 @@ func (e *State) since(dps Series, args ...float64) (a float64) {
 	return s.Seconds()
 }
 
-func Forecast_lr(e *State, T miniprofiler.Timer, series *Results, y float64) (r *Results, err error) {
+func Forecast_lr(e *State, T miniprofiler.Timer, series *Results, y *Results) (r *Results, err error) {
 	return reduce(e, T, series, e.forecast_lr, y)
 }
 
@@ -1085,20 +1114,20 @@ func (e *State) forecast_lr(dps Series, args ...float64) float64 {
 	return s.Seconds()
 }
 
-func Percentile(e *State, T miniprofiler.Timer, series *Results, p float64) (r *Results, err error) {
+func Percentile(e *State, T miniprofiler.Timer, series *Results, p *Results) (r *Results, err error) {
 	return reduce(e, T, series, percentile, p)
 }
 
 func Min(e *State, T miniprofiler.Timer, series *Results) (r *Results, err error) {
-	return reduce(e, T, series, percentile, 0)
+	return reduce(e, T, series, percentile, fromScalar(0))
 }
 
 func Median(e *State, T miniprofiler.Timer, series *Results) (r *Results, err error) {
-	return reduce(e, T, series, percentile, .5)
+	return reduce(e, T, series, percentile, fromScalar(.5))
 }
 
 func Max(e *State, T miniprofiler.Timer, series *Results) (r *Results, err error) {
-	return reduce(e, T, series, percentile, 1)
+	return reduce(e, T, series, percentile, fromScalar(1))
 }
 
 // percentile returns the value at the corresponding percentile between 0 and 1.

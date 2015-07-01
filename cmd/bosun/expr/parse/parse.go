@@ -46,8 +46,6 @@ func (f FuncType) String() string {
 		return "string"
 	case TypeSeriesSet:
 		return "series"
-	case TypeScalar:
-		return "scalar"
 	default:
 		return "unknown"
 	}
@@ -55,7 +53,6 @@ func (f FuncType) String() string {
 
 const (
 	TypeString FuncType = iota
-	TypeScalar
 	TypeNumberSet
 	TypeSeriesSet
 )

@@ -663,8 +663,6 @@ var defaultFuncs = ttemplate.FuncMap{
 			return ByteSize(v), nil
 		case expr.Number:
 			return ByteSize(v), nil
-		case expr.Scalar:
-			return ByteSize(v), nil
 		}
 		return ByteSize(0), fmt.Errorf("unexpected type: %T (%v)", v, v)
 	},
@@ -1105,7 +1103,7 @@ func (c *Conf) NewExpr(s string) *expr.Expr {
 		c.error(err)
 	}
 	switch exp.Root.Return() {
-	case eparse.TypeNumberSet, eparse.TypeScalar:
+	case eparse.TypeNumberSet:
 		break
 	default:
 		c.errorf("expression must return a number")

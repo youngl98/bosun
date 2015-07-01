@@ -447,8 +447,6 @@ func filterDependencyResults(results *expr.Results) expr.ResultSlice {
 		switch v := r.Value.(type) {
 		case expr.Number:
 			n = float64(v)
-		case expr.Scalar:
-			n = float64(v)
 		}
 		if !math.IsNaN(n) && n != 0 {
 			filtered = append(filtered, r)
@@ -531,8 +529,6 @@ Loop:
 		var n float64
 		switch v := r.Value.(type) {
 		case expr.Number:
-			n = float64(v)
-		case expr.Scalar:
 			n = float64(v)
 		default:
 			err = fmt.Errorf("expected number or scalar")

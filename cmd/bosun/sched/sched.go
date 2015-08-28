@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"runtime"
 	"sort"
 	"sync"
 	"time"
@@ -494,10 +495,18 @@ func (s *Schedule) Close() {
 const pingFreq = time.Second * 15
 
 func (s *Schedule) PingHosts() {
+	pingCh := make(chan string)
+	for i := 0; i < runtime.NumCPU(); i++ {
+		go func() {
+			for host := range pingCh {
+				pingHost(host)
+			}
+		}()
+	}
 	for range time.Tick(pingFreq) {
 		hosts := s.Search.TagValuesByTagKey("host", s.Conf.PingDuration)
 		for _, host := range hosts {
-			go pingHost(host)
+			pingCh <- host
 		}
 	}
 }

@@ -588,8 +588,10 @@ func bandTSDB(e *State, T miniprofiler.Timer, query, duration, period string, nu
 		if err != nil {
 			return
 		}
-		if err = e.Search.Expand(q); err != nil {
-			return
+		if e.tsdbContext.Version() == "" {
+			if err = e.Search.Expand(q); err != nil {
+				return
+			}
 		}
 		req := opentsdb.Request{
 			Queries: []*opentsdb.Query{q},
@@ -787,8 +789,10 @@ func Query(e *State, T miniprofiler.Timer, query, sduration, eduration string) (
 	if q == nil && err != nil {
 		return
 	}
-	if err = e.Search.Expand(q); err != nil {
-		return
+	if e.tsdbContext.Version() == "" {
+		if err = e.Search.Expand(q); err != nil {
+			return
+		}
 	}
 	sd, err := opentsdb.ParseDuration(sduration)
 	if err != nil {

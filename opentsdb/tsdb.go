@@ -344,6 +344,15 @@ type Query struct {
 	RateOptions RateOptions `json:"rateOptions,omitempty"`
 	Downsample  string      `json:"downsample,omitempty"`
 	Tags        TagSet      `json:"tags,omitempty"`
+	Filters     []Filter    `json:"filters,omitempty"`
+	GroupByTags TagSet      `json:"-"`
+}
+
+type Filter struct {
+	Type    string `json:"type"`
+	TagK    string `json:"tagk"`
+	Filter  string `json:"filter"`
+	GroupBy bool   `json:"groupBy"`
 }
 
 // RateOptions are rate options for a query.
@@ -378,7 +387,7 @@ func ParseRequest(req string) (*Request, error) {
 	return &r, nil
 }
 
-var qRE = regexp.MustCompile(`^(\w+):(?:(\w+-\w+):)?(?:(rate.*):)?([\w./-]+)(?:\{([\w./,=*-|]+)\})?$`)
+var qRE = regexp.MustCompile(`^(\w+):(?:(\w+-\w+):)?(?:(rate.*):)?([\w./-]+)(?:\{([\w./,=*-|\(\)]+)?\})?(?:\{([\w./,=*-|\(\)]+)?\})?$`)
 
 // ParseQuery parses OpenTSDB queries of the form: avg:rate:cpu{k=v}. Validation
 // errors will be returned along with a valid Query.
@@ -413,17 +422,77 @@ func ParseQuery(query string) (q *Query, err error) {
 		}
 	}
 	q.Metric = m[4]
-	if m[5] != "" {
-		tags, e := ParseTags(m[5])
-		if e != nil {
-			err = e
-			if tags == nil {
-				return
+	// If OpenTSDB <= 2.1
+	if len(m) < 6 {
+		if m[5] != "" {
+			tags, e := ParseTags(m[5])
+			if e != nil {
+				err = e
+				if tags == nil {
+					return
+				}
 			}
+			q.Tags = tags
 		}
-		q.Tags = tags
+		return
 	}
+	// OpenTSDB Greater than 2.2, treating as filters
+	q.GroupByTags = make(TagSet)
+	q.Filters = make([]Filter, 0)
+	if m[5] != "" {
+		f, err := ParseFilters(m[5], true, q)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to parse filter(s): %s", m[5])
+		}
+		q.Filters = append(q.Filters, f...)
+	}
+	if m[6] != "" {
+		f, err := ParseFilters(m[6], false, q)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to parse filter(s): %s", m[5])
+		}
+		q.Filters = append(q.Filters, f...)
+	}
+	slog.Infoln(q.Filters)
 	return
+}
+
+var filterValueRe = regexp.MustCompile(`([a-z_]+)\((.*)\)$`)
+
+func ParseFilters(rawFilters string, grouping bool, q *Query) ([]Filter, error) {
+	filters := make([]Filter, 0)
+	//slog.Infoln("rawFilters: ", rawFilters)
+	for _, rawFilter := range strings.Split(rawFilters, ",") {
+		//slog.Infoln("rawFilter: ", rawFilter)
+		splitRawFilter := strings.SplitN(rawFilter, "=", 2)
+		if len(splitRawFilter) != 2 {
+			return nil, fmt.Errorf("opentsdb: bad filter format: %s", rawFilter)
+		}
+		//slog.Infoln("splitRawFilter: ", splitRawFilter)
+		filter := Filter{}
+		filter.TagK = splitRawFilter[0]
+		q.GroupByTags[filter.TagK] = ""
+		// See if we have a filter function, if not we have to use legacy parsing defined in
+		// filter conversions of http://opentsdb.net/docs/build/html/api_http/query/index.html
+		m := filterValueRe.FindStringSubmatch(splitRawFilter[1])
+		if m != nil {
+			filter.Type = m[1]
+			filter.Filter = m[2]
+		} else {
+			// Legacy Conversion
+			filter.Type = "literal_or"
+			if strings.Contains(splitRawFilter[1], "*") {
+				filter.Type = "iwildcard"
+			}
+			if splitRawFilter[1] == "*" {
+				filter.Type = "wildcard"
+			}
+			filter.Filter = splitRawFilter[1]
+		}
+		filter.GroupBy = grouping
+		filters = append(filters, filter)
+	}
+	return filters, nil
 }
 
 // ParseTags parses OpenTSDB tagk=tagv pairs of the form: k=v,m=o. Validation
@@ -782,6 +851,7 @@ func (r *RequestError) Error() string {
 // Context is the interface for querying an OpenTSDB server.
 type Context interface {
 	Query(*Request) (ResponseSet, error)
+	Version() string
 }
 
 // Host is a simple OpenTSDB Context with no additional features.
@@ -799,16 +869,23 @@ type LimitContext struct {
 	Limit int64
 	// FilterTags removes tagks from results if that tagk was not in the request
 	FilterTags bool
+	// Use the version to see if groupby and filters are supported
+	TSDBVersion string
 }
 
 // NewLimitContext returns a new context for the given host with response sizes limited
 // to limit bytes.
-func NewLimitContext(host string, limit int64) *LimitContext {
+func NewLimitContext(host string, limit int64, version string) *LimitContext {
 	return &LimitContext{
-		Host:       host,
-		Limit:      limit,
-		FilterTags: true,
+		Host:        host,
+		Limit:       limit,
+		FilterTags:  true,
+		TSDBVersion: version,
 	}
+}
+
+func (c *LimitContext) Version() string {
+	return c.TSDBVersion
 }
 
 // Query returns the result of the request. r may be cached. The request is
@@ -844,7 +921,9 @@ func FilterTags(r *Request, tr ResponseSet) {
 	for _, resp := range tr {
 		for k := range resp.Tags {
 			if _, present := r.Queries[0].Tags[k]; !present {
-				delete(resp.Tags, k)
+				if _, present := r.Queries[0].GroupByTags[k]; !present {
+					delete(resp.Tags, k)
+				}
 			}
 		}
 	}
